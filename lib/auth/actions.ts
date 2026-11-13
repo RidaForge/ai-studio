@@ -2,8 +2,9 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createAuthActions, createServerClient } from "@insforge/sdk/ssr";
+import { clearAuthCookies, createAuthActions, createServerClient } from "@insforge/sdk/ssr";
 import { syncUserProfile } from "@/lib/auth/user-profile";
+import { insforgeAuthCookieNames } from "@/lib/insforge/auth-cookies";
 
 export type AuthFormState = {
   status: "idle" | "error" | "success";
@@ -49,14 +50,18 @@ export async function signInAction(_state: AuthFormState = idle, formData: FormD
   if (!emailPattern.test(email) || !password) return errorState("Enter a valid email address and password.");
 
   const cookieStore = await cookies();
-  const auth = createAuthActions({ cookies: cookieStore });
+  const auth = createAuthActions({ cookies: cookieStore, names: insforgeAuthCookieNames });
   const { data, error } = await auth.signInWithPassword({ email, password });
   if (error?.error === "AUTH_NEED_VERIFICATION") {
     setPendingVerificationCookie(cookieStore, email);
     redirect("/verify-email");
   }
   if (error || !data?.user) return errorState(error?.message ?? "We couldn't sign you in. Check your details and try again.");
-  const profileError = await syncUserProfile(createServerClient({ cookies: cookieStore }), data.user);
+  if (!cookieStore.get(insforgeAuthCookieNames.refreshToken)?.value) {
+    clearAuthCookies(cookieStore, { names: insforgeAuthCookieNames });
+    return errorState("InsForge did not create a refreshable session. Please try signing in again.");
+  }
+  const profileError = await syncUserProfile(createServerClient({ cookies: cookieStore, names: insforgeAuthCookieNames }), data.user);
   if (profileError) return errorState("You are signed in, but we couldn't save your user profile. Please try again.");
   redirect("/");
 }
@@ -71,7 +76,7 @@ export async function signUpAction(_state: AuthFormState = idle, formData: FormD
   if (password.length < 6) return errorState("Your password must be at least 6 characters.");
 
   const cookieStore = await cookies();
-  const auth = createAuthActions({ cookies: cookieStore });
+  const auth = createAuthActions({ cookies: cookieStore, names: insforgeAuthCookieNames });
   const { data, error } = await auth.signUp({ email, password, name });
   if (error || !data) return errorState(error?.message ?? "We couldn't create your account. Please try again.");
 
@@ -79,7 +84,7 @@ export async function signUpAction(_state: AuthFormState = idle, formData: FormD
   // setting, since it is the source of truth when the response omits the flag.
   let verificationRequired = data.requireEmailVerification === true || data.user?.emailVerified === false;
   if (!verificationRequired) {
-    const { data: authConfig } = await createServerClient({ cookies: cookieStore }).auth.getPublicAuthConfig();
+    const { data: authConfig } = await createServerClient({ cookies: cookieStore, names: insforgeAuthCookieNames }).auth.getPublicAuthConfig();
     verificationRequired = authConfig?.requireEmailVerification === true;
   }
 
@@ -89,7 +94,7 @@ export async function signUpAction(_state: AuthFormState = idle, formData: FormD
   }
 
   if (!data.user) return errorState("Your account was created, but we couldn't confirm its status. Try signing in or contact support.");
-  const profileError = await syncUserProfile(createServerClient({ cookies: cookieStore }), data.user, name);
+  const profileError = await syncUserProfile(createServerClient({ cookies: cookieStore, names: insforgeAuthCookieNames }), data.user, name);
   if (profileError) return errorState("Your account was created, but we couldn't save your user profile. Please sign in again to retry.");
   cookieStore.delete(pendingVerificationCookie);
   redirect("/");
@@ -102,7 +107,8 @@ export async function verifyEmailAction(_state: AuthFormState = idle, formData: 
   if (!emailPattern.test(email)) return errorState("Enter a valid email address.");
   if (!otpPattern.test(otp)) return errorState("Enter the 6-digit code from your email.");
 
-  const auth = createAuthActions({ cookies: await cookies() });
+  const cookieStore = await cookies();
+  const auth = createAuthActions({ cookies: cookieStore, names: insforgeAuthCookieNames });
   const { data, error } = await auth.verifyEmail({ email, otp });
   if (error) {
     if (error.statusCode === 400 || error.statusCode === 401) {
@@ -111,7 +117,7 @@ export async function verifyEmailAction(_state: AuthFormState = idle, formData: 
     return errorState(error.message || "We couldn't verify that code. Please try again.");
   }
   if (!data?.user) return errorState("InsForge could not confirm the code. Request a new code and try again.");
-  const profileError = await syncUserProfile(createServerClient({ cookies: await cookies() }), data.user);
+  const profileError = await syncUserProfile(createServerClient({ cookies: await cookies(), names: insforgeAuthCookieNames }), data.user);
   if (profileError) return errorState("Your email is verified, but we couldn't save your user profile. Please sign in to retry.");
   (await cookies()).delete(pendingVerificationCookie);
   redirect("/");
@@ -122,7 +128,7 @@ export async function resendVerificationAction(_state: AuthFormState = idle, for
   const cookieStore = await cookies();
   const email = (cookieStore.get(pendingVerificationCookie)?.value || value(formData, "email")).toLowerCase();
   if (!emailPattern.test(email)) return errorState("Enter a valid email address.");
-  const client = createServerClient({ cookies: cookieStore });
+  const client = createServerClient({ cookies: cookieStore, names: insforgeAuthCookieNames });
   const { data, error } = await client.auth.resendVerificationEmail({ email });
   if (error) {
     if (error.statusCode === 429) return errorState("Too many resend attempts. Wait a few minutes before requesting another code.");
@@ -139,7 +145,7 @@ export async function resendVerificationAction(_state: AuthFormState = idle, for
 }
 
 export async function signOutAction() {
-  const auth = createAuthActions({ cookies: await cookies() });
+  const auth = createAuthActions({ cookies: await cookies(), names: insforgeAuthCookieNames });
   const { error } = await auth.signOut();
   if (error) redirect("/sign-in?auth_error=signout");
   redirect("/sign-in");
@@ -149,12 +155,12 @@ export async function startOAuthAction(formData: FormData): Promise<void> {
   const provider = value(formData, "provider");
   if (provider !== "google" && provider !== "github") redirect("/sign-in?auth_error=provider");
 
-  const client = createServerClient({ cookies: await cookies() });
+  const client = createServerClient({ cookies: await cookies(), names: insforgeAuthCookieNames });
   const { data: config, error: configError } = await client.auth.getPublicAuthConfig();
   if (configError || !config?.oAuthProviders.includes(provider)) redirect("/sign-in?auth_error=provider");
 
   const cookieStore = await cookies();
-  const auth = createAuthActions({ cookies: cookieStore });
+  const auth = createAuthActions({ cookies: cookieStore, names: insforgeAuthCookieNames });
   const { data, error } = await auth.signInWithOAuth(provider, {
     redirectTo: new URL("/api/auth/callback", getAppOrigin()).toString(),
     skipBrowserRedirect: true,
@@ -175,7 +181,7 @@ export async function sendResetPasswordAction(_state: AuthFormState = idle, form
   void _state;
   const email = value(formData, "email").toLowerCase();
   if (!emailPattern.test(email)) return errorState("Enter a valid email address.");
-  const client = createServerClient({ cookies: await cookies() });
+  const client = createServerClient({ cookies: await cookies(), names: insforgeAuthCookieNames });
   const { data, error } = await client.auth.sendResetPasswordEmail({ email });
   if (error || !data?.success) return errorState(error?.message ?? "We couldn't send reset instructions. Please try again.");
   return { status: "success", email, message: "If an account exists for that email, a 6-digit reset code is on its way." };
@@ -192,7 +198,7 @@ export async function resetPasswordAction(_state: AuthFormState = idle, formData
   if (password.length < 6) return errorState("Your new password must be at least 6 characters.");
   if (password !== confirmPassword) return errorState("The passwords don't match.");
 
-  const client = createServerClient({ cookies: await cookies() });
+  const client = createServerClient({ cookies: await cookies(), names: insforgeAuthCookieNames });
   const { data: reset, error: exchangeError } = await client.auth.exchangeResetPasswordToken({ email, code });
   if (exchangeError || !reset?.token) return errorState(exchangeError?.message ?? "That code couldn't be verified. Request a fresh reset code.");
   const { error } = await client.auth.resetPassword({ newPassword: password, otp: reset.token });

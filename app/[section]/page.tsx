@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AuthenticatedWorkspace, WorkspaceFallback } from "@/components/workspace/authenticated-workspace";
 import { FeaturePlaceholder } from "@/components/workspace/feature-placeholder";
@@ -14,6 +14,7 @@ export function generateStaticParams() {
 
 export default async function WorkspaceDestinationPage({ params }: PageProps<"/[section]">) {
   const { section } = await params;
+  if (section === "avatar") redirect("/dashboard/avatar");
   const destination = section === "billing-settings"
     ? { slug: section, label: "User billing settings", description: "Manage your billing details and plan.", icon: allDestinations[0].icon }
     : allDestinations.find((item) => item.slug === section);
