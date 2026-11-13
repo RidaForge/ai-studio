@@ -29,12 +29,10 @@ The branch’s public config and local callback configuration were verified, and
 
 Confirm the OAuth client credentials are active in InsForge, and that the Google/GitHub developer consoles use InsForge’s provider callback URL shown in the InsForge dashboard. For deployment, add the deployed app callback URL to InsForge’s `allowed_redirect_urls` and set `NEXT_PUBLIC_APP_URL` to the deployed origin.
 
-## AI generation and saved history status
+## AI avatars and saved history status
 
-These features remain visibly pending; no fake model response, upload, database row, or history is produced. To enable them:
+The separate AI Avatars feature is implemented in `app/dashboard/avatar/` and `components/workspace/avatar-studio.tsx`. It uses authenticated routes under `app/api/avatars/`, the `public.avatars` table, the required private `avatars` Storage bucket, and the Trigger.dev task in `trigger/generate-avatar.ts`. Its task calls Cloudflare Workers AI's FLUX.2 Klein 4B model separately for 1024x576 and 576x1024 outputs, resizing the private source image to fit under 512x512 first.
 
-1. Install an OpenRouter-compatible client only if needed for the chosen server implementation (for example, `npm install --save-exact openai@7.53.0`). Keep `OPENROUTER_API_KEY` server-only.
-2. Run `npx -y @insforge/cli ai setup` against the intended backend branch and discover currently available text/image models before choosing IDs.
-3. Add a reviewed migration for an owner-scoped `public.generations` table with RLS using `auth.uid()`.
-4. Create a private `generated-assets` Storage bucket and owner path RLS for `storage.objects`; store both uploaded `url` and `key` with each generation.
-5. Add and verify an authenticated generation route for text and image modes, then test RLS and history with two user accounts before enabling the Generate button.
+The migration source is `migrations/20261111120000_create-avatars.sql`. It defines owner-only row policies and bucket-scoped storage-object policies. The migration does not create the Storage bucket; inspect the linked InsForge project, apply the migration if needed, and ensure `avatars` exists as a private bucket. Setup commands and required environment variable names are documented in `docs/ai-avatars-setup.md`.
+
+These are source-code facts, not proof of a successful runtime generation. Authentication, migration state, bucket privacy, Trigger.dev Development environment variables, Cloudflare generation, signed image access, and realtime progress require runtime verification against the intended services. The general Studio generation and history described earlier in this file remain pending and are separate from AI Avatars.

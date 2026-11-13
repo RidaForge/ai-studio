@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createAuthActions } from "@insforge/sdk/ssr";
 import { createServerClient } from "@insforge/sdk/ssr";
 import { syncUserProfile } from "@/lib/auth/user-profile";
+import { insforgeAuthCookieNames } from "@/lib/insforge/auth-cookies";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -26,6 +27,7 @@ export async function GET(request: NextRequest) {
   const auth = createAuthActions({
     requestCookies: request.cookies,
     responseCookies: response.cookies,
+    names: insforgeAuthCookieNames,
   });
   const { data, error } = await auth.exchangeOAuthCode(code, codeVerifier);
   response.cookies.delete("insforge_code_verifier");
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
     response.headers.set("Location", new URL("/sign-in?auth_error=exchange", request.url).toString());
   } else {
     const profileError = await syncUserProfile(
-      createServerClient({ accessToken: response.cookies.get("insforge_access_token")?.value }),
+      createServerClient({ accessToken: response.cookies.get(insforgeAuthCookieNames.accessToken)?.value, names: insforgeAuthCookieNames }),
       data.user,
     );
     if (profileError) {

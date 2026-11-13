@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Sparkles } from "lucide-react";
-import { allDestinations } from "@/components/workspace/workspace-data";
+import { allDestinations, workspaceHref } from "@/components/workspace/workspace-data";
 
 const mediaBySlug: Record<string, { src: string; type: "video" | "image" }> = {
   "ai-video-agent": { src: "/ai-video-agent.mp4", type: "video" },
@@ -32,7 +32,7 @@ export function DashboardHome() {
             const media = mediaBySlug[feature.slug];
             const Icon = feature.icon;
             return (
-              <Link className={`feature-card feature-card-${index + 1}`} href={`/${feature.slug}`} key={feature.slug}>
+              <Link className={`feature-card feature-card-${index + 1}`} href={workspaceHref(feature)} key={feature.slug}>
                 {media.type === "video" ? (
                   <video className="feature-card-media" autoPlay muted loop playsInline aria-hidden="true" tabIndex={-1}>
                     <source src={media.src} type="video/mp4" />

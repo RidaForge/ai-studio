@@ -2,6 +2,7 @@ import {
   AudioLines,
   Clapperboard,
   FolderOpen,
+  Home,
   UserRound,
   Video,
   type LucideIcon,
@@ -12,7 +13,12 @@ export type WorkspaceDestination = {
   label: string;
   description: string;
   icon: LucideIcon;
+  href?: string;
 };
+
+export function workspaceHref(destination: WorkspaceDestination) {
+  return destination.href ?? `/${destination.slug}`;
+}
 
 export const workspaceDestinations: WorkspaceDestination[] = [
   {
@@ -29,9 +35,10 @@ export const workspaceDestinations: WorkspaceDestination[] = [
   },
   {
     slug: "avatar",
-    label: "Avatar",
+    label: "AI Avatars",
     description: "Build a digital presence that looks and feels like you.",
     icon: UserRound,
+    href: "/dashboard/avatar",
   },
   {
     slug: "ai-voice-cloning",
@@ -51,6 +58,6 @@ export const libraryDestination: WorkspaceDestination = {
 export const allDestinations = [...workspaceDestinations, libraryDestination];
 
 export const navigationItems = [
-  { label: "Home", href: "/", icon: null },
-  ...allDestinations.map((item) => ({ label: item.label, href: `/${item.slug}`, icon: item.icon })),
+  { label: "Home", href: "/", icon: Home },
+  ...allDestinations.map((item) => ({ label: item.label, href: workspaceHref(item), icon: item.icon })),
 ];

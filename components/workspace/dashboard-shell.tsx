@@ -5,33 +5,19 @@ import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  AudioLines,
   CircleUserRound,
-  Clapperboard,
   CreditCard,
-  FolderOpen,
-  Home,
   LogOut,
   Menu,
   Sparkles,
-  UserRound,
-  Video,
   X,
 } from "lucide-react";
 import { Brand } from "@/components/auth/auth-shell";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOutAction } from "@/lib/auth/actions";
+import { navigationItems } from "@/components/workspace/workspace-data";
 
 type UserInfo = { email: string; name: string | null };
-
-const navItems = [
-  { label: "Home", href: "/", icon: Home },
-  { label: "AI Video Agent", href: "/ai-video-agent", icon: Clapperboard },
-  { label: "AI Video Avatar", href: "/ai-video-avatar", icon: Video },
-  { label: "Avatar", href: "/avatar", icon: UserRound },
-  { label: "AI Voice Cloning", href: "/ai-voice-cloning", icon: AudioLines },
-  { label: "My Library", href: "/my-library", icon: FolderOpen },
-];
 
 function SignOutButton() {
   const { pending } = useFormStatus();
@@ -46,7 +32,7 @@ function SignOutButton() {
 export function DashboardShell({ user, children }: { user: UserInfo; children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const currentItem = navItems.find((item) => item.href === pathname);
+  const currentItem = navigationItems.find((item) => item.href === pathname);
   const currentLabel = currentItem?.label ?? "Workspace";
 
   return (
@@ -69,7 +55,7 @@ export function DashboardShell({ user, children }: { user: UserInfo; children: R
 
         <span className="dashboard-nav-label">WORKSPACE</span>
         <nav className="dashboard-nav" aria-label="Main navigation">
-          {navItems.map(({ label, href, icon: Icon }) => {
+          {navigationItems.map(({ label, href, icon: Icon }) => {
             const active = pathname === href;
             return (
               <Link
